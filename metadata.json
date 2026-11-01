@@ -1,0 +1,6 @@
+{
+  "name": "Apex Quantum & Cyber Defense Suite",
+  "description": "Unified platform featuring VSAT Blue Team Toolkit, AEGIS SOC Framework, and Quantum-Inspired Tensor Simulators (Nebula, Titan, Hyperion).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
