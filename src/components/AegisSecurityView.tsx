@@ -158,7 +158,6 @@ export const AegisSecurityView: React.FC<AegisSecurityViewProps> = ({
 
   // Fetch Live Real Post-Quantum Key & Ephemeral Ciphertext from Server API
   const handleRotatePqcLive = async () => {
-    onIncrementPqcKey();
     try {
       const res = await fetch('/api/pqc/generate', {
         method: 'POST',
@@ -168,19 +167,21 @@ export const AegisSecurityView: React.FC<AegisSecurityViewProps> = ({
       if (res.ok) {
         const data = await res.json();
         setLivePqcData(data);
+        onIncrementPqcKey();
         addLog('PQC', `Rotated ML-KEM-1024 keypair via Live Server. Public Fingerprint: ${data.keypair.publicKeyFingerprint.slice(0, 20)}...`, 'LiveServerCrypto', 'low');
       } else {
-        addLog('PQC', 'Rotated Post-Quantum CRYSTALS-Kyber-1024 session keypair. Ephemeral ciphertext encapsulated.', 'QuantumCrypto', 'low');
+        const errBody = await res.json().catch(() => ({}));
+        addLog('ALERT', `PQC rotation error (${res.status}): ${errBody.error || 'Server rejected key generation request.'}`, 'LiveServerCrypto', 'high');
       }
-    } catch {
-      addLog('PQC', 'Rotated Post-Quantum CRYSTALS-Kyber-1024 session keypair. Ephemeral ciphertext encapsulated.', 'QuantumCrypto', 'low');
+    } catch (err: any) {
+      addLog('ALERT', `PQC server unreachable: ${err?.message || 'Network failure'}`, 'LiveServerCrypto', 'high');
     }
   };
 
   // Fetch Live Threat Stream from Gemini Server API
   const handleFetchLiveThreatStream = async () => {
     setIsFetchingLiveFeed(true);
-    addLog('INFO', 'Contacting Gemini 3.8 Live Cyber Intelligence Stream for real-time telemetry...', 'LiveThreatStream', 'medium');
+    addLog('INFO', 'Contacting Gemini Live Cyber Intelligence Stream for real-time telemetry...', 'LiveThreatStream', 'medium');
     try {
       const res = await fetch('/api/intel/live-threats', {
         method: 'POST',
@@ -192,9 +193,9 @@ export const AegisSecurityView: React.FC<AegisSecurityViewProps> = ({
         }),
       });
 
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        const data = await res.json();
-        addLog('INFO', `Live Threat Intelligence Ingested: ${data.summary || '3 vectors analyzed'}`, 'GeminiLiveIntel', 'high');
+        addLog('INFO', `Live Threat Intelligence Ingested: ${data.summary || 'Threat vectors analyzed'}`, 'GeminiLiveIntel', 'high');
         if (data.threats && Array.isArray(data.threats)) {
           data.threats.forEach((t: any) => {
             onIncrementBlockedThreat();
@@ -202,10 +203,10 @@ export const AegisSecurityView: React.FC<AegisSecurityViewProps> = ({
           });
         }
       } else {
-        addLog('INFO', 'Live telemetry stream sync complete using localized threat database.', 'LiveThreatStream', 'low');
+        addLog('ALERT', `Live Threat Stream error (${res.status}): ${data.message || data.error || 'Unable to reach Gemini threat engine.'}`, 'LiveThreatStream', 'high');
       }
     } catch (e: any) {
-      addLog('INFO', 'Live telemetry stream synced using localized offline buffer.', 'LiveThreatStream', 'low');
+      addLog('ALERT', `Live Threat Stream connection failed: ${e?.message || 'Network error'}`, 'LiveThreatStream', 'high');
     } finally {
       setIsFetchingLiveFeed(false);
     }

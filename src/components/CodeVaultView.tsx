@@ -59,8 +59,8 @@ export const CodeVaultView: React.FC = () => {
   };
 
   const handleDownloadAll = () => {
-    allArtifacts.forEach(a => {
-      setTimeout(() => handleDownload(a), 200);
+    allArtifacts.forEach((a, index) => {
+      setTimeout(() => handleDownload(a), index * 250);
     });
   };
 
@@ -209,7 +209,7 @@ export const CodeVaultView: React.FC = () => {
 
               <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
                 <span className="text-slate-500 block text-[10px] uppercase font-bold mb-1">Prerequisites</span>
-                <span className="text-cyan-400">{activeArtifact.prerequisites.join(' &bull; ')}</span>
+                <span className="text-cyan-400">{activeArtifact.prerequisites.join(' • ')}</span>
               </div>
             </div>
 

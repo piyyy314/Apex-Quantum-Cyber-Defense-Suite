@@ -2,25 +2,26 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import path from 'path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(express.json({ limit: '10mb' }));
+const PORT = Number(process.env.PORT) || 3000;
+const GEMINI_MODEL = 'gemini-4-hydrogen';
 
 // Initialize Google GenAI Client on server side
-const apiKey = process.env.GEMINI_API_KEY;
-let ai: GoogleGenAI | null = null;
-if (apiKey) {
-  ai = new GoogleGenAI({
-    apiKey: apiKey,
+function getGenAiClient(): GoogleGenAI | null {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+    return null;
+  }
+  return new GoogleGenAI({
+    apiKey,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -29,231 +30,305 @@ if (apiKey) {
   });
 }
 
-// ----------------------------------------------------
-// REAL LIVE API ENDPOINTS
-// ----------------------------------------------------
+export interface QuantumSimulationInput {
+  numQubits?: number;
+  maxBondDim?: number;
+  noiseTolerance?: number;
+  gridX?: number;
+  gridY?: number;
+}
 
-// 1. Health Check
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'OPERATIONAL',
-    timestamp: new Date().toISOString(),
-    aiEngineAvailable: !!ai,
-    environment: process.env.NODE_ENV || 'development',
-    version: '2.0.0-PROD',
+export function calculateQuantumSimulation(input: QuantumSimulationInput) {
+  const numQubits = Number(input.numQubits ?? 16);
+  const maxBondDim = Number(input.maxBondDim ?? 32);
+  const noiseTolerance = Number(input.noiseTolerance ?? 0.001);
+  const gridX = Number(input.gridX ?? 4);
+  const gridY = Number(input.gridY ?? 4);
+
+  if (
+    !Number.isFinite(numQubits) ||
+    numQubits < 1 ||
+    numQubits > 256 ||
+    !Number.isFinite(maxBondDim) ||
+    maxBondDim < 1 ||
+    maxBondDim > 4096 ||
+    !Number.isFinite(noiseTolerance) ||
+    noiseTolerance < 0 ||
+    noiseTolerance > 1
+  ) {
+    throw new Error('Invalid quantum simulation parameters.');
+  }
+
+  const startTime = performance.now();
+
+  // Real mathematical tensor calculations
+  const physicalDimension = Math.pow(2, Math.min(numQubits, 50));
+  const effectiveBond = Math.max(1, Math.min(maxBondDim, Math.floor(numQubits * 1.5)));
+
+  // Von Neumann Entropy calculation: S = - sum(lambda_i^2 * log2(lambda_i^2))
+  const singularValues = Array.from({ length: effectiveBond }, (_, i) =>
+    Math.exp(-i * (0.1 + noiseTolerance * 10))
+  );
+  const sumSq = singularValues.reduce((acc, val) => acc + val * val, 0);
+  const normalizedS = singularValues.map((v) => v / Math.sqrt(sumSq));
+
+  let entropy = 0;
+  normalizedS.forEach((v) => {
+    const p = v * v;
+    if (p > 1e-12) {
+      entropy -= p * Math.log2(p);
+    }
   });
-});
 
-// 2. Real Live Threat Intelligence Feed Generation & Synthesis via Gemini API
-app.post('/api/intel/live-threats', async (req, res) => {
-  try {
-    const { category, environment, targetScope } = req.body;
+  const mpsTensorElements = numQubits * 2 * effectiveBond * effectiveBond;
+  const fullStateVectorElements = physicalDimension;
+  const rawSaved =
+    fullStateVectorElements > 0
+      ? (1 - mpsTensorElements / (fullStateVectorElements * 1024)) * 100
+      : 0;
+  const ramSavedPercent = Number(Math.max(0, Math.min(99.99, rawSaved)).toFixed(2));
+  const executionTimeMs = Number(Math.max(0.01, performance.now() - startTime).toFixed(3));
 
-    if (!ai) {
-      // Fallback deterministic live feed generator if API key is not yet set
-      return res.json({
-        source: 'AEGIS Local Telemetry Engine',
-        timestamp: new Date().toISOString(),
-        threats: [
-          {
-            id: 'CVE-2026-8910',
-            title: 'Satellite Gateway TR-069 Remote Code Execution',
-            severity: 'CRITICAL',
-            target: environment || 'Satellite Ground Segment',
-            mitigation: 'Enforce mTLS on ACS endpoint and apply PQC Dilithium firmware patch',
-            timestamp: new Date().toISOString(),
-          },
-          {
-            id: 'CVE-2026-4412',
-            title: 'VSAT RF Carrier Phase Jitter Spoofing',
-            severity: 'HIGH',
-            target: targetScope || '192.168.10.0/24',
-            mitigation: 'Enable 3-sigma SNR statistical threshold monitoring',
-            timestamp: new Date().toISOString(),
-          },
-        ],
-      });
-    }
+  return {
+    success: true,
+    timestamp: new Date().toISOString(),
+    numQubits,
+    gridTopology: `${gridX}x${gridY}`,
+    physicalHilbertSpace: `2^${numQubits}`,
+    effectiveBondDimension: effectiveBond,
+    vonNeumannEntropyBits: Number(entropy.toFixed(4)),
+    krausDampingGamma: noiseTolerance,
+    executionTimeMs,
+    ramSavedPercent,
+    svdTruncatedValues: Math.max(0, maxBondDim * 2 - effectiveBond),
+    status: 'MATHEMATICALLY_VERIFIED',
+  };
+}
 
-    const prompt = `You are a Tier-3 Cyber Threat Intelligence analyst for defense and satellite communication networks.
-Generate a realistic, live security threat intelligence assessment for:
-Environment: ${environment || 'VSAT Maritime / SCADA Ground Network'}
-Scope: ${targetScope || '192.168.10.0/24'}
-Category: ${category || 'Zero-Day / APT Threat Vectors'}
+export function generatePqcKeypair(algorithm = 'ML-KEM-1024') {
+  const randomHex = (byteLength: number) => crypto.randomBytes(byteLength).toString('hex');
 
-Return a valid JSON object matching this structure (no markdown formatting, strictly raw JSON):
-{
-  "summary": "Brief 2-sentence executive operational summary",
-  "threatCount": 3,
-  "threats": [
-    {
-      "id": "CVE-2026-XXXX",
-      "title": "Threat name",
-      "severity": "CRITICAL" | "HIGH" | "MEDIUM",
-      "target": "Target component or subnet",
-      "vector": "Attack vector details",
-      "mitigation": "Recommended blue team countermeasure",
-      "timestamp": "ISO timestamp"
-    }
-  ],
-  "threatActorProfile": "Associated APT group (e.g. Sandworm, APT28, APT33)",
-  "pqcReadinessRecommendation": "Specific Post-Quantum Cryptography migration advice"
-}`;
+  const upperAlg = algorithm.toUpperCase();
+  const fipsStandard = upperAlg.includes('SLH')
+    ? 'FIPS 205'
+    : upperAlg.includes('DSA')
+      ? 'FIPS 204'
+      : 'FIPS 203';
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
+  const securityCategory =
+    upperAlg.includes('512') || upperAlg.includes('44') || upperAlg.includes('128')
+      ? 'NIST Level 1-2 (AES-128 / SHA-256 equivalent quantum hardness)'
+      : upperAlg.includes('768') || upperAlg.includes('65') || upperAlg.includes('192')
+        ? 'NIST Level 3 (AES-192 equivalent quantum hardness)'
+        : 'NIST Level 5 (AES-256 equivalent quantum hardness)';
 
-    const jsonText = response.text || '{}';
-    const parsed = JSON.parse(jsonText);
-    res.json({
-      source: 'Gemini 3.8 Live Cyber Intelligence Stream',
-      timestamp: new Date().toISOString(),
-      ...parsed,
-    });
-  } catch (err: any) {
-    console.error('Error generating live threats:', err);
-    res.status(500).json({
-      error: 'Failed to synthesize live threat feed',
-      message: err.message,
-    });
-  }
-});
-
-// 3. Live AI Security Analyzer Endpoint
-app.post('/api/cyber/analyze', async (req, res) => {
-  try {
-    const { codeSnippet, logLines, systemContext } = req.body;
-
-    if (!ai) {
-      return res.json({
-        analysis: 'Local AI Sandbox: Potential Command Injection detected in log line parse.',
-        severity: 'HIGH',
-        recommendations: [
-          'Sanitize input using strict white-list regex',
-          'Disable shell execution wrappers',
-          'Enforce non-root process privileges',
-        ],
-      });
-    }
-
-    const prompt = `You are an elite automated Blue Team code & log auditor. Analyze the following security data:
-System Context: ${systemContext || 'VSAT / SOC Network'}
-Security Data:
-${codeSnippet || logLines || 'No code provided'}
-
-Identify all vulnerabilities, command injection signatures, credential exposure risk, or post-quantum cryptographic non-compliance.
-Respond in valid JSON format:
-{
-  "riskScore": 85,
-  "overallSeverity": "CRITICAL" | "HIGH" | "MEDIUM" | "LOW",
-  "findings": [
-    {
-      "type": "Command Injection | Credential Exposure | PQC Non-Compliance | Protocol Vulnerability",
-      "description": "Detailed finding explanation",
-      "remediation": "Exact fix or code patch"
-    }
-  ],
-  "pqcCompliance": {
-    "isCompliant": false,
-    "currentAlgorithms": ["RSA-2048", "ECDSA-P256"],
-    "recommendedAlgorithms": ["ML-KEM-1024", "ML-DSA-87"]
-  }
-}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-
-    const parsed = JSON.parse(response.text || '{}');
-    res.json(parsed);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 4. Live Server Quantum Tensor Network Math Calculator
-app.post('/api/quantum/simulate', (req, res) => {
-  try {
-    const { numQubits = 16, maxBondDim = 32, noiseTolerance = 0.001, gridX = 4, gridY = 4 } = req.body;
-
-    // Real mathematical tensor calculations
-    const physicalDimension = Math.pow(2, Math.min(numQubits, 50));
-    const effectiveBond = Math.min(maxBondDim, Math.floor(numQubits * 1.5));
-    
-    // Von Neumann Entropy calculation simulation: S = - sum(lambda_i^2 * log2(lambda_i^2))
-    const singularValues = Array.from({ length: effectiveBond }, (_, i) => Math.exp(-i * (0.1 + noiseTolerance * 10)));
-    const sumSq = singularValues.reduce((acc, val) => acc + val * val, 0);
-    const normalizedS = singularValues.map(v => v / Math.sqrt(sumSq));
-    
-    let entropy = 0;
-    normalizedS.forEach(v => {
-      const p = v * v;
-      if (p > 1e-12) {
-        entropy -= p * Math.log2(p);
-      }
-    });
-
-    const executionTimeMs = (numQubits * 0.12 + Math.random() * 0.08).toFixed(3);
-    const ramSavedPercent = Math.min(99.99, (100 - (effectiveBond * effectiveBond * 16) / (physicalDimension * 16)) * 100).toFixed(2);
-
-    res.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      numQubits,
-      gridTopology: `${gridX}x${gridY}`,
-      physicalHilbertSpace: `2^${numQubits}`,
-      effectiveBondDimension: effectiveBond,
-      vonNeumannEntropyBits: Number(entropy.toFixed(4)),
-      krausDampingGamma: noiseTolerance,
-      executionTimeMs: Number(executionTimeMs),
-      ramSavedPercent: Number(ramSavedPercent),
-      svdTruncatedValues: Math.max(0, maxBondDim * 2 - effectiveBond),
-      status: 'MATHEMATICALLY_VERIFIED',
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 5. Post-Quantum Cryptographic Key Generator Endpoint
-app.post('/api/pqc/generate', (req, res) => {
-  const { algorithm = 'ML-KEM-1024' } = req.body;
-
-  // Generate real cryptographic hex fingerprints
-  const randomBytes = (len: number) =>
-    Array.from({ length: len }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join('');
-
-  const publicKeyFingerprint = `pk_0x${randomBytes(32)}`;
-  const secretKeyFingerprint = `sk_0x${randomBytes(32)}`;
-  const ciphertextFingerprint = `ct_0x${randomBytes(32)}`;
-
-  res.json({
+  return {
     algorithm,
-    fipsStandard: algorithm.includes('KEM') ? 'FIPS 203' : 'FIPS 204',
-    securityCategory: 'NIST Level 5 (AES-256 equivalent quantum hardness)',
+    fipsStandard,
+    securityCategory,
     keypair: {
-      publicKeyFingerprint,
-      secretKeyFingerprint,
-      ciphertextFingerprint,
-      encapsulatedSharedSecretHex: randomBytes(32),
+      publicKeyFingerprint: `pk_0x${randomHex(32)}`,
+      secretKeyFingerprint: `sk_0x${randomHex(32)}`,
+      ciphertextFingerprint: `ct_0x${randomHex(32)}`,
+      encapsulatedSharedSecretHex: randomHex(32),
     },
     generatedAt: new Date().toISOString(),
+  };
+}
+
+export function createApp() {
+  const app = express();
+  app.use(express.json({ limit: '10mb' }));
+
+  // 1. Health Check
+  app.get('/api/health', (_req, res) => {
+    const ai = getGenAiClient();
+    res.json({
+      status: 'OPERATIONAL',
+      timestamp: new Date().toISOString(),
+      aiEngineAvailable: !!ai,
+      model: GEMINI_MODEL,
+      environment: process.env.NODE_ENV || 'development',
+      version: '2.0.0-PROD',
+    });
   });
-});
+
+  // 2. Real Live Threat Intelligence Feed Generation & Synthesis via Gemini API (supports GET and POST)
+  const handleLiveThreats = async (req: express.Request, res: express.Response) => {
+    try {
+      const sourceInput = req.method === 'GET' ? req.query : req.body ?? {};
+      const category = typeof sourceInput.category === 'string' ? sourceInput.category : 'Zero-Day / APT Threat Vectors';
+      const environment = typeof sourceInput.environment === 'string' ? sourceInput.environment : 'VSAT Maritime / SCADA Ground Network';
+      const targetScope = typeof sourceInput.targetScope === 'string' ? sourceInput.targetScope : '192.168.10.0/24';
+
+      const ai = getGenAiClient();
+      if (!ai) {
+        return res.status(503).json({
+          error: 'GEMINI_API_KEY is not configured on the server.',
+          message: 'Please configure GEMINI_API_KEY in Settings > Secrets to enable live Gemini threat synthesis.',
+        });
+      }
+
+      const prompt = `You are a Tier-3 Cyber Threat Intelligence analyst for defense and satellite communication networks.
+Generate a realistic, live security threat intelligence assessment for:
+Environment: ${environment}
+Scope: ${targetScope}
+Category: ${category}`;
+
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              summary: { type: Type.STRING },
+              threatCount: { type: Type.INTEGER },
+              threats: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    title: { type: Type.STRING },
+                    severity: { type: Type.STRING },
+                    target: { type: Type.STRING },
+                    vector: { type: Type.STRING },
+                    mitigation: { type: Type.STRING },
+                    timestamp: { type: Type.STRING },
+                  },
+                },
+              },
+              threatActorProfile: { type: Type.STRING },
+              pqcReadinessRecommendation: { type: Type.STRING },
+            },
+          },
+        },
+      });
+
+      const jsonText = (response.text ?? '{}').trim();
+      const parsed = JSON.parse(jsonText);
+      res.json({
+        source: `Gemini (${GEMINI_MODEL}) Live Cyber Intelligence Stream`,
+        timestamp: new Date().toISOString(),
+        ...parsed,
+      });
+    } catch (err: any) {
+      console.error('Error generating live threats:', err);
+      res.status(500).json({
+        error: 'Failed to synthesize live threat feed',
+        message: err?.message || 'Unknown upstream error',
+      });
+    }
+  };
+
+  app.get('/api/intel/live-threats', handleLiveThreats);
+  app.post('/api/intel/live-threats', handleLiveThreats);
+
+  // 3. Live AI Security Analyzer Endpoint
+  app.post('/api/cyber/analyze', async (req, res) => {
+    try {
+      const { codeSnippet, logLines, systemContext } = req.body ?? {};
+      const securityData = codeSnippet || logLines;
+      if (!securityData || typeof securityData !== 'string') {
+        return res.status(400).json({ error: 'codeSnippet or logLines string is required.' });
+      }
+
+      const ai = getGenAiClient();
+      if (!ai) {
+        return res.status(503).json({
+          error: 'GEMINI_API_KEY is not configured on the server.',
+          message: 'Please configure GEMINI_API_KEY in Settings > Secrets to enable AI payload analysis.',
+        });
+      }
+
+      const prompt = `You are an elite automated Blue Team code & log auditor. Analyze the following security data:
+System Context: ${systemContext || 'VSAT / SOC Network'}
+Security Data:
+${securityData}
+
+Identify all vulnerabilities, command injection signatures, credential exposure risk, or post-quantum cryptographic non-compliance.`;
+
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              riskScore: { type: Type.INTEGER },
+              overallSeverity: { type: Type.STRING },
+              findings: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    type: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    remediation: { type: Type.STRING },
+                  },
+                },
+              },
+              pqcCompliance: {
+                type: Type.OBJECT,
+                properties: {
+                  isCompliant: { type: Type.BOOLEAN },
+                  currentAlgorithms: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                  recommendedAlgorithms: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const parsed = JSON.parse((response.text ?? '{}').trim());
+      res.json(parsed);
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to analyze security data', message: err?.message });
+    }
+  });
+
+  // 4. Live Server Quantum Tensor Network Math Calculator
+  app.post('/api/quantum/simulate', (req, res) => {
+    try {
+      const result = calculateQuantumSimulation(req.body ?? {});
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err?.message || 'Invalid quantum simulation request' });
+    }
+  });
+
+  // 5. Post-Quantum Cryptographic Key Generator Endpoint
+  app.post('/api/pqc/generate', (req, res) => {
+    const algorithm = typeof req.body?.algorithm === 'string' && req.body.algorithm.trim()
+      ? req.body.algorithm.trim()
+      : 'ML-KEM-1024';
+    res.json(generatePqcKeypair(algorithm));
+  });
+
+  // Return JSON 404 for unknown API endpoints
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'API endpoint not found' });
+  });
+
+  return app;
+}
 
 // ----------------------------------------------------
 // VITE DEV MIDDLEWARE / STATIC FILE SERVING
 // ----------------------------------------------------
 async function startServer() {
+  const app = createApp();
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -273,6 +348,12 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-});
+const isMainModule =
+  process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
+
+if (isMainModule && process.env.NODE_ENV !== 'test') {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  });
+}

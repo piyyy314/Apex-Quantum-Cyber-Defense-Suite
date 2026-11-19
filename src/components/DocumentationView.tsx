@@ -42,7 +42,7 @@ export const DocumentationView: React.FC = () => {
             In 2018, an 18-year-old undergraduate researcher at UT Austin named <strong>Ewin Tang</strong> (advised by Scott Aaronson) 
             disproved this claim by constructing a classical algorithm that achieves polynomial speedups matching the quantum algorithm. 
             By borrowing quantum sampling assumptions—specifically that classical data can be queried in a tree data structure with 
-            $L_2$-norm sampling—she "dequantized" the algorithm.
+            L<sub>2</sub>-norm sampling—she "dequantized" the algorithm.
           </p>
           <p className="text-cyan-400">
             This established that quantum machine learning algorithms frequently appear faster only because they assume convenient quantum state inputs, 
@@ -67,7 +67,7 @@ export const DocumentationView: React.FC = () => {
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
             <span className="font-bold text-rose-400 block uppercase font-mono">The Physical Vulnerability: Photon Loss</span>
             <p className="text-slate-400 leading-relaxed">
-              In real physical hardware, optical interferometers suffer high photon loss ($&gt;60\%$). Photons scatter into the vacuum environment.
+              In real physical hardware, optical interferometers suffer high photon loss (&gt;60%). Photons scatter into the vacuum environment.
               This physical loss causes quantum density matrices to rapidly decay from pure entangled states into classical mixed states.
             </p>
           </div>
@@ -77,7 +77,7 @@ export const DocumentationView: React.FC = () => {
             <p className="text-slate-400 leading-relaxed">
               Classical engineers at the Flatiron Institute, Google, and elsewhere constructed Matrix Product State (MPS) and PEPS tensor networks.
               Because the physical entanglement was destroyed by photon loss, Singular Value Decomposition (SVD) dropped singular values 
-              below the noise threshold ($S_i &lt; \epsilon$). The 2.5-billion-year simulation finished on classical supercomputers in mere hours.
+              below the noise threshold (S<sub>i</sub> &lt; &epsilon;). The 2.5-billion-year simulation finished on classical supercomputers in mere hours.
             </p>
           </div>
         </div>

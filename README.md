@@ -125,9 +125,9 @@ The suite exposes the following production Express REST endpoints:
 | Endpoint | Method | Description |
 |---|---|---|
 | `/api/health` | `GET` | Health check and system uptime monitor |
-| `/api/intel/live-threats` | `GET` | Real-time global threat stream generated via Gemini AI |
+| `/api/intel/live-threats` | `GET / POST` | Real-time global threat stream generated via Gemini AI |
 | `/api/cyber/analyze` | `POST` | AI-powered deep threat payload analysis |
-| `/api/quantum/simulate` | `POST` | High-fidelity quantum tensor simulation engine (Shor / Grover / Lattice) |
+| `/api/quantum/simulate` | `POST` | High-fidelity quantum tensor simulation engine (MPS / SVD / Entropy) |
 | `/api/pqc/generate` | `POST` | NIST-compliant PQC key pair generation (ML-KEM, ML-DSA, SLH-DSA) |
 
 ---
@@ -146,13 +146,21 @@ docker run -d -p 3000:3000 -e GEMINI_API_KEY="your_gemini_api_key" --name apex-s
 
 ---
 
-## 🧪 Verification & Quality Control
+## 🧪 Verification, Tests & Quality Control
 
-Verify code health and type integrity prior to committing:
+All automated test suites live under `tests/` (Node/TypeScript API & math tests plus Python `unittest`/`pytest` suites for `python/` modules):
 
 ```bash
 # Type check and linting
 npm run lint
+
+# Run Node.js / Express API & quantum math tests
+npm test
+
+# Run Python validation tests (Hyperion, Nebula, VSAT defensive tools)
+npm run test:python
+# or with pytest inside .venv:
+pytest tests/ -v
 
 # Production Vite build check
 npm run build

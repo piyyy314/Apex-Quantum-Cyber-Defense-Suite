@@ -81,7 +81,7 @@ export const NebulaQuantumView: React.FC = () => {
     const kept = Math.max(2, totalPotentialSingularValues - discarded);
 
     const execTime = (qubitCount * circuitDepth * 0.18 + (Math.random() * 0.05)).toFixed(3);
-    const ramSaved = Math.min(99.99, (100 - (1 / Math.pow(2, qubitCount - 8)) * 100)).toFixed(2);
+    const ramSaved = Math.max(0, Math.min(99.99, (100 - (1 / Math.pow(2, qubitCount - 8)) * 100))).toFixed(2);
 
     setSimResults({
       executionTimeMs: parseFloat(execTime),
@@ -283,7 +283,7 @@ export const NebulaQuantumView: React.FC = () => {
                   </div>
                 </div>
 
-                {simResults.entropyBits && (
+                {simResults.entropyBits !== undefined && (
                   <div className="p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-500/30 text-xs font-mono text-indigo-300 flex items-center justify-between">
                     <span>Verified Server Entropy: {simResults.entropyBits} bits</span>
                     <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">

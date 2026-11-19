@@ -39,7 +39,11 @@ echo "⚡ Upgrading pip and installing required Python packages..."
 pip install --upgrade pip
 
 # Install rich, numpy, scipy, and core quantum/sim packages
-pip install rich numpy scipy
+if [ -f "requirements.txt" ]; then
+    pip install -r requirements.txt
+else
+    pip install rich numpy scipy
+fi
 
 echo "✅ Python environment successfully configured with: rich, numpy, scipy"
 

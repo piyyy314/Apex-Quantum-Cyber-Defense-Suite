@@ -226,9 +226,13 @@ def scan(logfile):
     <script>
         function switchTab(name) {
             document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(e => {
+                e.classList.remove('active');
+                if (e.getAttribute('onclick')?.includes("'" + name + "'")) {
+                    e.classList.add('active');
+                }
+            });
             document.getElementById(name).classList.add('active');
-            event.target.classList.add('active');
         }
         function generateHuntPlan() {
             const out = document.getElementById('huntOutput');
