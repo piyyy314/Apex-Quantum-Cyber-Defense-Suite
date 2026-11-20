@@ -86,6 +86,33 @@ class AdvancedTensorNetwork:
         s_l2 = float(np.linalg.norm(raw_s_real)) if raw_count > 0 else 0.0
         condition_num = float(s_max / max(s_min, 1e-15)) if raw_count > 0 else float("inf")
 
+        zero_padded = False
+        # Align U, S, and Vh dimensions prior to boolean masking in case SVD returns
+        # fewer singular vectors or fewer singular values than expected.
+        aligned_rank = max(len(S), U.shape[1], Vh.shape[0])
+        if aligned_rank > 0:
+            if U.shape != (L_dim, aligned_rank):
+                zero_padded = True
+                padded_u = np.zeros((L_dim, aligned_rank), dtype=np.complex128)
+                rows = min(L_dim, U.shape[0])
+                cols = min(aligned_rank, U.shape[1])
+                padded_u[:rows, :cols] = U[:rows, :cols]
+                U = padded_u
+
+            if len(S) < aligned_rank:
+                zero_padded = True
+                padded_s = np.zeros((aligned_rank,), dtype=np.float64)
+                padded_s[: len(S)] = np.real(S)
+                S = padded_s
+
+            if Vh.shape != (aligned_rank, R_dim):
+                zero_padded = True
+                padded_vh = np.zeros((aligned_rank, R_dim), dtype=np.complex128)
+                rows = min(aligned_rank, Vh.shape[0])
+                cols = min(R_dim, Vh.shape[1])
+                padded_vh[:rows, :cols] = Vh[:rows, :cols]
+                Vh = padded_vh
+
         # Filter by noise threshold while retaining at least the dominant singular value if present
         keep_indices = S > self.noise_tolerance
         if not np.any(keep_indices) and len(S) > 0:
@@ -105,10 +132,9 @@ class AdvancedTensorNetwork:
 
         truncation_error = float(np.linalg.norm(dropped_s)) if len(dropped_s) > 0 else 0.0
 
-        # Safety check: dynamically zero-pad U, S, and Vh if SVD yields fewer singular values
-        # than the required bond dimension, preventing shape-mismatch ValueErrors.
+        # Safety check: dynamically zero-pad U, S, and Vh if post-filter rank is 0
+        # or does not match the required bond dimension, preventing shape-mismatch ValueErrors.
         required_bond = max(1, min(self.max_bond_dim, max(len(S), U.shape[1], Vh.shape[0])))
-        zero_padded = False
 
         if U.shape != (L_dim, required_bond):
             zero_padded = True

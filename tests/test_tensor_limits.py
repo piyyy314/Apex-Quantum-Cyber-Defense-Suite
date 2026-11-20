@@ -111,6 +111,22 @@ class TestTensorLimits(unittest.TestCase):
         with patch("numpy.linalg.svd", side_effect=mock_reduced_svd):
             tn.apply_two_qubit_gate(cnot, 1, 2)
 
+        self.assertTrue(tn.svd_history[-1]["zero_padded"])
+        self._assert_mps_invariants_and_stability(tn, expected_max_bond=2)
+
+        # Simulate SVD returning fewer singular values than U/Vh columns
+        def mock_short_s_svd(matrix, full_matrices=False):
+            m, n = matrix.shape
+            return (
+                np.eye(m, 2, dtype=np.complex128),
+                np.array([0.9], dtype=np.float64),
+                np.eye(2, n, dtype=np.complex128),
+            )
+
+        with patch("numpy.linalg.svd", side_effect=mock_short_s_svd):
+            tn.apply_two_qubit_gate(cnot, 1, 2)
+
+        self.assertTrue(tn.svd_history[-1]["zero_padded"])
         self._assert_mps_invariants_and_stability(tn, expected_max_bond=2)
 
         # Simulate SVD returning empty singular values (0 rank)
@@ -125,6 +141,7 @@ class TestTensorLimits(unittest.TestCase):
         with patch("numpy.linalg.svd", side_effect=mock_empty_svd):
             tn.apply_two_qubit_gate(cnot, 0, 1)
 
+        self.assertTrue(tn.svd_history[-1]["zero_padded"])
         self._assert_mps_invariants_and_stability(tn, expected_max_bond=2)
 
     def test_svd_diagnostic_logging_and_history_snapshots(self):
