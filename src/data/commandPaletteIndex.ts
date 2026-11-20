@@ -89,6 +89,15 @@ const COMPONENT_ITEMS: CommandSearchItem[] = [
     target: { track: 'quantum', quantumSub: 'nebula' },
   },
   {
+    id: 'comp-tensor-visualizer',
+    title: 'TensorNetworkVisualizer — D3 Quantum Bond Health Graph',
+    subtitle: 'Interactive D3.js 1D MPS topology graph, bond saturation metrics, and SVD spectrum chart.',
+    category: 'Components',
+    path: 'src/components/TensorNetworkVisualizer.tsx',
+    keywords: ['d3', 'visualizer', 'tensor', 'bond', 'svd', 'spectrum', 'topology', 'health', 'component'],
+    target: { track: 'quantum', quantumSub: 'nebula' },
+  },
+  {
     id: 'comp-titan-peps',
     title: 'TitanPEPSView — Project Titan (2D PEPS & Ray Cluster)',
     subtitle: 'Interactive 2D qubit lattice topology, 5D PEPS tensor inspector, and Apache Ray worker dispatch.',
@@ -216,6 +225,15 @@ const REPO_PROJECT_FILES: CommandSearchItem[] = [
     path: 'tests/test_hyperion.py',
     keywords: ['test', 'pytest', 'python', 'hyperion', 'kraus', 'entropy'],
     target: { track: 'vault', vaultArtifactId: 'test-hyperion' },
+  },
+  {
+    id: 'repo-tests-tensor-limits',
+    title: 'tests/test_tensor_limits.py',
+    subtitle: 'Python edge-case tests for low max_bond_dim and SVD zero-padding fallback',
+    category: 'Project Files',
+    path: 'tests/test_tensor_limits.py',
+    keywords: ['test', 'pytest', 'python', 'tensor', 'max_bond_dim', 'svd', 'limits'],
+    target: { track: 'quantum', quantumSub: 'nebula' },
   },
   {
     id: 'repo-tests-vsat',

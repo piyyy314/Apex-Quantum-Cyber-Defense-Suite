@@ -50,8 +50,35 @@ test('POST /api/quantum/simulate returns mathematically verified tensor metrics'
     assert.equal(data.status, 'MATHEMATICALLY_VERIFIED');
     assert.equal(data.physicalHilbertSpace, '2^16');
     assert.equal(data.effectiveBondDimension, 24);
+    assert.equal(data.maxBondDimension, 32);
     assert.ok(data.vonNeumannEntropyBits > 0);
     assert.ok(data.ramSavedPercent >= 0 && data.ramSavedPercent <= 99.99);
+    assert.ok(Array.isArray(data.singularValueSpectrum));
+    assert.ok(data.singularValueSpectrum.length > 0);
+    assert.ok(['OPTIMAL', 'MODERATE_COMPRESSION', 'CRITICAL_SATURATION'].includes(data.bondHealthSummary));
+    assert.ok(data.networkTopology);
+    assert.equal(data.networkTopology.nodes.length, 16);
+    assert.equal(data.networkTopology.links.length, 15);
+  });
+});
+
+test('POST /api/quantum/simulate flags CRITICAL_SATURATION when bond capacity is saturated', async () => {
+  await withServer(async (baseUrl) => {
+    const res = await fetch(`${baseUrl}/api/quantum/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        numQubits: 16,
+        maxBondDim: 4,
+        noiseTolerance: 0.0001,
+      }),
+    });
+
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.bondHealthSummary, 'CRITICAL_SATURATION');
+    assert.equal(data.bondSaturationRatio, 1);
+    assert.ok(data.networkTopology.links.some((link: { health: string }) => link.health === 'CRITICAL'));
   });
 });
 

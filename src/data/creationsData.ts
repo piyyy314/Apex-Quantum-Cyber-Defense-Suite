@@ -579,8 +579,10 @@ class AdvancedTensorNetwork:
         # SVD Computation
         U, S, Vh = np.linalg.svd(matrix, full_matrices=False)
         
-        # SVD Truncation based on noise threshold
+        # SVD Truncation based on noise threshold with fallback
         keep_indices = S > self.noise_tolerance
+        if not np.any(keep_indices) and len(S) > 0:
+            keep_indices[0] = True
         U = U[:, keep_indices]
         S = S[keep_indices]
         Vh = Vh[keep_indices, :]
@@ -590,13 +592,28 @@ class AdvancedTensorNetwork:
             U = U[:, :self.max_bond_dim]
             S = S[:self.max_bond_dim]
             Vh = Vh[:self.max_bond_dim, :]
+
+        if len(S) == 0:
+            U = np.zeros((L_dim, 1), dtype=np.complex128)
+            S = np.zeros((1,), dtype=np.float64)
+            Vh = np.zeros((1, R_dim), dtype=np.complex128)
             
         S_sqrt = np.diag(np.sqrt(S))
         U_new = np.dot(U, S_sqrt)
         V_new = np.dot(S_sqrt, Vh)
+
+        effective_bond = max(1, min(self.max_bond_dim, max(U_new.shape[1], V_new.shape[0])))
+        if U_new.shape != (L_dim, effective_bond):
+            padded_u = np.zeros((L_dim, effective_bond), dtype=np.complex128)
+            padded_u[:L_dim, :min(effective_bond, U_new.shape[1])] = U_new[:, :min(effective_bond, U_new.shape[1])]
+            U_new = padded_u
+        if V_new.shape != (effective_bond, R_dim):
+            padded_v = np.zeros((effective_bond, R_dim), dtype=np.complex128)
+            padded_v[:min(effective_bond, V_new.shape[0]), :R_dim] = V_new[:min(effective_bond, V_new.shape[0]), :]
+            V_new = padded_v
         
-        self.tensors[target1] = U_new.reshape(T_A.shape[0], 2, len(S))
-        self.tensors[target2] = V_new.reshape(len(S), 2, T_B.shape[2])
+        self.tensors[target1] = U_new.reshape(T_A.shape[0], 2, effective_bond)
+        self.tensors[target2] = V_new.reshape(effective_bond, 2, T_B.shape[2])
 
     def calculate_norm(self):
         """Calculates the probability norm of the current state using optimal pathing."""

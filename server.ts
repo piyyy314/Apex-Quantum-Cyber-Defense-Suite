@@ -80,6 +80,68 @@ export function calculateQuantumSimulation(input: QuantumSimulationInput) {
     }
   });
 
+  // Per-bond and per-node MPS topology & health metrics
+  const displayNodes = Math.min(numQubits, 24);
+  const links = Array.from({ length: Math.max(0, displayNodes - 1) }, (_, i) => {
+    const distanceFromEdge = Math.min(i + 1, displayNodes - 1 - i);
+    const theoreticalRank = Math.pow(2, Math.min(distanceFromEdge, 10));
+    const noiseFactor = Math.exp(-noiseTolerance * 18 * Math.min(distanceFromEdge, 4));
+    const rawBond = Math.max(1, Math.min(theoreticalRank, Math.round(effectiveBond * noiseFactor)));
+    const bondDim = Math.min(maxBondDim, rawBond);
+    const utilization = Number((bondDim / maxBondDim).toFixed(3));
+    const isCapped = theoreticalRank > maxBondDim && bondDim >= maxBondDim;
+    const health: 'HEALTHY' | 'WARNING' | 'CRITICAL' =
+      isCapped || utilization >= 0.9
+        ? 'CRITICAL'
+        : utilization >= 0.65
+          ? 'WARNING'
+          : 'HEALTHY';
+    const truncationLoss = Number(
+      Math.max(0, (1 - bondDim / Math.min(theoreticalRank, 64)) * noiseTolerance * 10).toFixed(5)
+    );
+
+    return {
+      source: i,
+      target: i + 1,
+      bondDim,
+      maxBondDim,
+      utilization,
+      health,
+      truncationLoss,
+    };
+  });
+
+  const nodes = Array.from({ length: displayNodes }, (_, i) => {
+    const leftLink = i > 0 ? links[i - 1] : null;
+    const rightLink = i < links.length ? links[i] : null;
+    const peakUtil = Math.max(leftLink?.utilization ?? 0, rightLink?.utilization ?? 0);
+    const worstHealth =
+      leftLink?.health === 'CRITICAL' || rightLink?.health === 'CRITICAL'
+        ? 'SATURATED'
+        : leftLink?.health === 'WARNING' || rightLink?.health === 'WARNING'
+          ? 'COMPRESSED'
+          : 'HEALTHY';
+    const localEntropy = Number((entropy * (0.4 + 0.6 * peakUtil)).toFixed(3));
+
+    return {
+      id: i,
+      label: `q[${i}]`,
+      physicalDim: 2,
+      localEntropy,
+      status: worstHealth as 'HEALTHY' | 'COMPRESSED' | 'SATURATED',
+    };
+  });
+
+  const bondSaturationRatio = Number((effectiveBond / maxBondDim).toFixed(3));
+  const criticalCount = links.filter((l) => l.health === 'CRITICAL').length;
+  const warningCount = links.filter((l) => l.health === 'WARNING').length;
+  const bondHealthSummary: 'OPTIMAL' | 'MODERATE_COMPRESSION' | 'CRITICAL_SATURATION' =
+    criticalCount > 0
+      ? 'CRITICAL_SATURATION'
+      : warningCount > 0
+        ? 'MODERATE_COMPRESSION'
+        : 'OPTIMAL';
+
   const mpsTensorElements = numQubits * 2 * effectiveBond * effectiveBond;
   const fullStateVectorElements = physicalDimension;
   const rawSaved =
@@ -96,11 +158,19 @@ export function calculateQuantumSimulation(input: QuantumSimulationInput) {
     gridTopology: `${gridX}x${gridY}`,
     physicalHilbertSpace: `2^${numQubits}`,
     effectiveBondDimension: effectiveBond,
+    maxBondDimension: maxBondDim,
+    bondSaturationRatio,
+    bondHealthSummary,
     vonNeumannEntropyBits: Number(entropy.toFixed(4)),
     krausDampingGamma: noiseTolerance,
     executionTimeMs,
     ramSavedPercent,
     svdTruncatedValues: Math.max(0, maxBondDim * 2 - effectiveBond),
+    singularValueSpectrum: normalizedS.slice(0, 16).map((v) => Number(v.toFixed(5))),
+    networkTopology: {
+      nodes,
+      links,
+    },
     status: 'MATHEMATICALLY_VERIFIED',
   };
 }

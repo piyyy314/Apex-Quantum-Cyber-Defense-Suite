@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { 
   Cpu, 
   Sliders, 
@@ -6,9 +6,15 @@ import {
   Download, 
   Binary, 
   Layers, 
-  TrendingDown
+  TrendingDown,
+  AlertTriangle
 } from 'lucide-react';
 import { CREATIONS_ARCHIVE } from '../data/creationsData';
+import {
+  TensorNetworkVisualizer,
+  TensorNodeMetric,
+  TensorLinkMetric,
+} from './TensorNetworkVisualizer';
 
 export const NebulaQuantumView: React.FC = () => {
   const [qubitCount, setQubitCount] = useState(16);
@@ -16,6 +22,7 @@ export const NebulaQuantumView: React.FC = () => {
   const [noiseTolerance, setNoiseTolerance] = useState(0.001); // 1e-3
   const [circuitDepth, setCircuitDepth] = useState(3);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [simResults, setSimResults] = useState<{
     executionTimeMs: number;
     ramSavedPercentage: number;
@@ -25,6 +32,13 @@ export const NebulaQuantumView: React.FC = () => {
     singularValuesDiscarded: number;
     entropyBits?: number;
     status?: string;
+  } | null>(null);
+  const [topologyState, setTopologyState] = useState<{
+    nodes: TensorNodeMetric[];
+    links: TensorLinkMetric[];
+    singularValueSpectrum: number[];
+    bondHealthSummary: 'OPTIMAL' | 'MODERATE_COMPRESSION' | 'CRITICAL_SATURATION';
+    bondSaturationRatio: number;
   } | null>(null);
 
   // QIML Encoder
@@ -36,9 +50,11 @@ export const NebulaQuantumView: React.FC = () => {
   } | null>(null);
 
   const nebulaArtifact = CREATIONS_ARCHIVE.find(a => a.id === 'project-nebula');
+  const isInitialMount = useRef(true);
 
-  const handleRunCircuit = async () => {
+  const handleRunCircuit = useCallback(async () => {
     setIsSimulating(true);
+    setApiError(null);
     try {
       const res = await fetch('/api/quantum/simulate', {
         method: 'POST',
@@ -51,47 +67,63 @@ export const NebulaQuantumView: React.FC = () => {
         })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setSimResults({
-          executionTimeMs: data.executionTimeMs,
-          ramSavedPercentage: data.ramSavedPercent,
-          effectiveBondDim: data.effectiveBondDimension,
-          hilbertSpaceDim: data.physicalHilbertSpace,
-          singularValuesKept: Math.floor(data.effectiveBondDimension * 0.8),
-          singularValuesDiscarded: data.svdTruncatedValues,
-          entropyBits: data.vonNeumannEntropyBits,
-          status: data.status
-        });
-      } else {
-        fallbackCalculation();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        const message = data?.error || `Backend simulation returned HTTP ${res.status}`;
+        setApiError(message);
+        return;
       }
-    } catch {
-      fallbackCalculation();
+
+      const spectrum: number[] = Array.isArray(data.singularValueSpectrum)
+        ? data.singularValueSpectrum
+        : [];
+
+      setSimResults({
+        executionTimeMs: data.executionTimeMs,
+        ramSavedPercentage: data.ramSavedPercent,
+        effectiveBondDim: data.effectiveBondDimension,
+        hilbertSpaceDim: data.physicalHilbertSpace,
+        singularValuesKept:
+          spectrum.length > 0
+            ? spectrum.filter((val) => val > noiseTolerance).length
+            : data.effectiveBondDimension,
+        singularValuesDiscarded: data.svdTruncatedValues,
+        entropyBits: data.vonNeumannEntropyBits,
+        status: data.status
+      });
+
+      if (data.networkTopology) {
+        setTopologyState({
+          nodes: data.networkTopology.nodes ?? [],
+          links: data.networkTopology.links ?? [],
+          singularValueSpectrum: spectrum,
+          bondHealthSummary: data.bondHealthSummary ?? 'OPTIMAL',
+          bondSaturationRatio: data.bondSaturationRatio ?? 0,
+        });
+      }
+    } catch (err) {
+      setApiError(
+        err instanceof Error
+          ? `Unable to reach /api/quantum/simulate: ${err.message}`
+          : 'Unable to reach live backend simulation engine.'
+      );
     } finally {
       setIsSimulating(false);
     }
-  };
+  }, [qubitCount, maxBondDim, noiseTolerance, circuitDepth]);
 
-  const fallbackCalculation = () => {
-    const rawDim = Math.pow(2, Math.min(qubitCount, 30));
-    const effectiveBond = Math.min(maxBondDim, Math.floor(qubitCount * 1.5));
-    const totalPotentialSingularValues = effectiveBond * 2;
-    const discarded = Math.floor(totalPotentialSingularValues * (noiseTolerance * 400 + 0.3));
-    const kept = Math.max(2, totalPotentialSingularValues - discarded);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      void handleRunCircuit();
+      return;
+    }
 
-    const execTime = (qubitCount * circuitDepth * 0.18 + (Math.random() * 0.05)).toFixed(3);
-    const ramSaved = Math.max(0, Math.min(99.99, (100 - (1 / Math.pow(2, qubitCount - 8)) * 100))).toFixed(2);
-
-    setSimResults({
-      executionTimeMs: parseFloat(execTime),
-      ramSavedPercentage: parseFloat(ramSaved),
-      effectiveBondDim: effectiveBond,
-      hilbertSpaceDim: `2^${qubitCount} (${rawDim > 1e12 ? rawDim.toExponential(2) : rawDim.toLocaleString()})`,
-      singularValuesKept: kept,
-      singularValuesDiscarded: discarded
-    });
-  };
+    const timer = window.setTimeout(() => {
+      void handleRunCircuit();
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [handleRunCircuit]);
 
   const handleEncodeData = () => {
     const raw = inputFeatures.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
@@ -254,6 +286,13 @@ export const NebulaQuantumView: React.FC = () => {
               <span className="text-xs font-mono text-slate-500">opt_einsum contract('lir, rjs -&gt; lijs')</span>
             </div>
 
+            {apiError && (
+              <div className="mb-4 p-3 rounded-lg bg-rose-950/30 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
+                <span>Live simulation error: {apiError}</span>
+              </div>
+            )}
+
             {simResults ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono text-xs">
@@ -303,10 +342,26 @@ export const NebulaQuantumView: React.FC = () => {
               </div>
             ) : (
               <div className="py-12 text-center text-slate-500 text-xs font-mono">
-                Click "Simulate Circuit" above to evaluate the 1D Matrix Product State with SVD truncation.
+                {isSimulating
+                  ? 'Executing live server tensor contraction & SVD telemetry...'
+                  : 'Click "Simulate Circuit" above to evaluate the 1D Matrix Product State with SVD truncation.'}
               </div>
             )}
           </div>
+
+          {/* Real-Time D3 Tensor Network Visualizer */}
+          <TensorNetworkVisualizer
+            nodes={topologyState?.nodes ?? []}
+            links={topologyState?.links ?? []}
+            singularValueSpectrum={topologyState?.singularValueSpectrum ?? []}
+            bondHealthSummary={topologyState?.bondHealthSummary ?? 'OPTIMAL'}
+            bondSaturationRatio={topologyState?.bondSaturationRatio ?? 0}
+            noiseTolerance={noiseTolerance}
+            numQubits={qubitCount}
+            isLoading={isSimulating}
+            errorMessage={apiError}
+            onRefresh={handleRunCircuit}
+          />
 
           {/* Quantum-Inspired Machine Learning Encoder */}
           <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/70 space-y-4">
