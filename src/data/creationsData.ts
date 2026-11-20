@@ -569,7 +569,7 @@ class AdvancedTensorNetwork:
         block = oe.contract('lir, rjs -> lijs', T_A, T_B)
         
         # Apply the 2-qubit gate (P1, P2) -> (P1_out, P2_out)
-        block = oe.contract('abcd, lcrd -> labr', gate.reshape(2,2,2,2), block)
+        block = oe.contract('abij, lijs -> labs', gate.reshape(2,2,2,2), block)
         
         # Reshape into a 2D matrix for SVD
         L_dim = block.shape[0] * block.shape[1]
@@ -711,16 +711,16 @@ class PEPS2D:
         T2 = self.tensors[(x, y2)]
         
         # 1. Contract along the Right bond of T1 and Left bond of T2
-        block = oe.contract('udls p, UV s r P -> udl UV r p P', T1, T2, backend='cupy' if GPU_ENABLED else 'numpy')
+        block = oe.contract('udlsp, UVsrP -> udlUVrpP', T1, T2, backend='cupy' if GPU_ENABLED else 'numpy')
         
         # 2. Apply Quantum Gate
         gate_tensor = xp.array(gate).reshape(2, 2, 2, 2)
-        block = oe.contract('abcd, udl UV r c d -> udl UV r a b', gate_tensor, block)
+        block = oe.contract('abpP, udlUVrpP -> udlUVrab', gate_tensor, block)
         
         # 3. Reshape for SVD
         left_dim = block.shape[0] * block.shape[1] * block.shape[2] * block.shape[6]
         right_dim = block.shape[3] * block.shape[4] * block.shape[5] * block.shape[7]
-        matrix = block.reshape(left_dim, right_dim)
+        matrix = block.transpose(0, 1, 2, 6, 3, 4, 5, 7).reshape(left_dim, right_dim)
         
         # 4. SVD on GPU/CPU
         U, S, Vh = xp.linalg.svd(matrix, full_matrices=False)
@@ -732,8 +732,8 @@ class PEPS2D:
             U, S, Vh = U[:, :self.max_bond_dim], S[:self.max_bond_dim], Vh[:self.max_bond_dim, :]
             
         S_sqrt = xp.diag(xp.sqrt(S))
-        T1_new = xp.dot(U, S_sqrt).reshape(T1.shape[0], T1.shape[1], T1.shape[2], len(S), 2)
-        T2_new = xp.dot(S_sqrt, Vh).reshape(T2.shape[0], T2.shape[1], len(S), T2.shape[3], 2)
+        T1_new = xp.dot(U, S_sqrt).reshape(T1.shape[0], T1.shape[1], T1.shape[2], 2, len(S)).transpose(0, 1, 2, 4, 3)
+        T2_new = xp.dot(S_sqrt, Vh).reshape(len(S), T2.shape[0], T2.shape[1], T2.shape[3], 2).transpose(1, 2, 0, 3, 4)
         
         self.tensors[(x, y1)] = T1_new
         self.tensors[(x, y2)] = T2_new
@@ -855,16 +855,16 @@ class AdvancedPEPS:
         T1 = self.tensors[(x, y1)]
         T2 = self.tensors[(x, y2)]
         
-        block = oe.contract('udls p, UV s r P -> udl UV r p P', T1, T2, backend='cupy' if GPU_ENABLED else 'numpy')
+        block = oe.contract('udlsp, UVsrP -> udlUVrpP', T1, T2, backend='cupy' if GPU_ENABLED else 'numpy')
         gate_tensor = xp.array(gate).reshape(2, 2, 2, 2)
-        block = oe.contract('abcd, udl UV r c d -> udl UV r a b', gate_tensor, block)
+        block = oe.contract('abpP, udlUVrpP -> udlUVrab', gate_tensor, block)
         
         kraus_ops = QuantumNoise.amplitude_damping(self.noise_gamma)
-        block = oe.contract('ab, udl UV r P b -> udl UV r P a', kraus_ops[0], block)
+        block = oe.contract('kb, udlUVrab -> udlUVrak', kraus_ops[0], block)
         
         left_dim = block.shape[0] * block.shape[1] * block.shape[2] * block.shape[6]
         right_dim = block.shape[3] * block.shape[4] * block.shape[5] * block.shape[7]
-        matrix = block.reshape(left_dim, right_dim)
+        matrix = block.transpose(0, 1, 2, 6, 3, 4, 5, 7).reshape(left_dim, right_dim)
         
         U, S, Vh = xp.linalg.svd(matrix, full_matrices=False)
         self.total_entropy += self.calculate_von_neumann_entropy(S)
@@ -873,8 +873,8 @@ class AdvancedPEPS:
             U, S, Vh = U[:, :self.max_bond], S[:self.max_bond], Vh[:self.max_bond, :]
             
         S_sqrt = xp.diag(xp.sqrt(S))
-        self.tensors[(x, y1)] = xp.dot(U, S_sqrt).reshape(T1.shape[0], T1.shape[1], T1.shape[2], len(S), 2)
-        self.tensors[(x, y2)] = xp.dot(S_sqrt, Vh).reshape(T2.shape[0], T2.shape[1], len(S), T2.shape[3], 2)
+        self.tensors[(x, y1)] = xp.dot(U, S_sqrt).reshape(T1.shape[0], T1.shape[1], T1.shape[2], 2, len(S)).transpose(0, 1, 2, 4, 3)
+        self.tensors[(x, y2)] = xp.dot(S_sqrt, Vh).reshape(len(S), T2.shape[0], T2.shape[1], T2.shape[3], 2).transpose(1, 2, 0, 3, 4)
 
     def contract_grid_bmps(self):
         console.print("[cyan]Initiating Boundary MPS (BMPS) 2D Grid Contraction...[/]")

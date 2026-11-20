@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Header } from './components/Header';
 import { VsatToolkitView } from './components/VsatToolkitView';
 import { AegisSecurityView } from './components/AegisSecurityView';
@@ -7,19 +7,53 @@ import { TitanPEPSView } from './components/TitanPEPSView';
 import { HyperionExascaleView } from './components/HyperionExascaleView';
 import { CodeVaultView } from './components/CodeVaultView';
 import { DocumentationView } from './components/DocumentationView';
+import { CommandPalette } from './components/CommandPalette';
+import { CommandNavigationTarget } from './data/commandPaletteIndex';
 import { AppTrack } from './types';
 import { CREATIONS_ARCHIVE, VALIDATION_TEST_SUITE } from './data/creationsData';
-import { Shield, Cpu, Code, BookOpen, Radio, Sparkles, Grid } from 'lucide-react';
+import { Shield, Cpu, Sparkles, Grid, Radio } from 'lucide-react';
 
 export default function App() {
   const [activeTrack, setActiveTrack] = useState<AppTrack>('defense');
   const [activeDefenseSub, setActiveDefenseSub] = useState<'vsat' | 'aegis'>('vsat');
   const [activeQuantumSub, setActiveQuantumSub] = useState<'nebula' | 'titan' | 'hyperion'>('nebula');
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null);
+  const [activeDocSectionId, setActiveDocSectionId] = useState<string | null>(null);
 
   // Shared platform telemetry state
   const [pqcKeysCount, setPqcKeysCount] = useState(14);
   const [blockedThreatsCount, setBlockedThreatsCount] = useState(128);
   const [entropyBits, setEntropyBits] = useState(14.39);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  const handleCommandNavigate = (target: CommandNavigationTarget) => {
+    setActiveTrack(target.track);
+    if (target.defenseSub) {
+      setActiveDefenseSub(target.defenseSub);
+    }
+    if (target.quantumSub) {
+      setActiveQuantumSub(target.quantumSub);
+    }
+    if (target.vaultArtifactId) {
+      setSelectedVaultId(target.vaultArtifactId);
+    }
+    if (target.docSectionId) {
+      setActiveDocSectionId(target.docSectionId);
+    } else if (target.track === 'docs') {
+      setActiveDocSectionId(null);
+    }
+  };
 
   const handleDownloadAll = () => {
     const all = [...CREATIONS_ARCHIVE, VALIDATION_TEST_SUITE];
@@ -49,6 +83,7 @@ export default function App() {
         activeTrack={activeTrack}
         onSelectTrack={setActiveTrack}
         onDownloadAll={handleDownloadAll}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         pqcKeysCount={pqcKeysCount}
         blockedThreatsCount={blockedThreatsCount}
         entropyBits={entropyBits}
@@ -170,13 +205,19 @@ export default function App() {
         )}
 
         {activeTrack === 'vault' && (
-          <CodeVaultView />
+          <CodeVaultView selectedArtifactId={selectedVaultId} />
         )}
 
         {activeTrack === 'docs' && (
-          <DocumentationView />
+          <DocumentationView activeSectionId={activeDocSectionId} />
         )}
       </main>
+
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigate={handleCommandNavigate}
+      />
 
       {/* Footer */}
       <footer className="border-t border-slate-800 bg-slate-950 py-6 text-xs text-slate-500 font-mono">

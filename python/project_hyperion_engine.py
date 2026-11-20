@@ -86,14 +86,14 @@ class AdvancedPEPS:
 
         block = _contract("udlsp,UVsrP->udlUVrpP", T1, T2)
         gate_tensor = xp.array(gate, dtype=xp.complex128).reshape(2, 2, 2, 2)
-        block = _contract("abcd,udlUVrcd->udlUVrab", gate_tensor, block)
+        block = _contract("abpP,udlUVrpP->udlUVrab", gate_tensor, block)
 
         kraus_ops = QuantumNoise.amplitude_damping(self.noise_gamma)
-        block = _contract("ab,udlUVrPb->udlUVrPa", kraus_ops[0], block)
+        block = _contract("kb,udlUVrab->udlUVrak", kraus_ops[0], block)
 
         left_dim = block.shape[0] * block.shape[1] * block.shape[2] * block.shape[6]
         right_dim = block.shape[3] * block.shape[4] * block.shape[5] * block.shape[7]
-        matrix = block.reshape(left_dim, right_dim)
+        matrix = block.transpose(0, 1, 2, 6, 3, 4, 5, 7).reshape(left_dim, right_dim)
 
         U, S, Vh = xp.linalg.svd(matrix, full_matrices=False)
         self.total_entropy += self.calculate_von_neumann_entropy(S)
@@ -102,8 +102,16 @@ class AdvancedPEPS:
             U, S, Vh = U[:, : self.max_bond], S[: self.max_bond], Vh[: self.max_bond, :]
 
         S_sqrt = xp.diag(xp.sqrt(S))
-        self.tensors[(x, y1)] = xp.dot(U, S_sqrt).reshape(T1.shape[0], T1.shape[1], T1.shape[2], len(S), 2)
-        self.tensors[(x, y2)] = xp.dot(S_sqrt, Vh).reshape(T2.shape[0], T2.shape[1], len(S), T2.shape[3], 2)
+        self.tensors[(x, y1)] = (
+            xp.dot(U, S_sqrt)
+            .reshape(T1.shape[0], T1.shape[1], T1.shape[2], 2, len(S))
+            .transpose(0, 1, 2, 4, 3)
+        )
+        self.tensors[(x, y2)] = (
+            xp.dot(S_sqrt, Vh)
+            .reshape(len(S), T2.shape[0], T2.shape[1], T2.shape[3], 2)
+            .transpose(1, 2, 0, 3, 4)
+        )
 
     def contract_grid_bmps(self) -> str:
         boundary = [self.tensors[(0, y)] for y in range(self.grid_y)]

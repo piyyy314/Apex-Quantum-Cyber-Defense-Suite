@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Code, 
   Download, 
@@ -16,13 +16,25 @@ import {
 import { CREATIONS_ARCHIVE, VALIDATION_TEST_SUITE } from '../data/creationsData';
 import { CodeArtifact } from '../types';
 
-export const CodeVaultView: React.FC = () => {
+interface CodeVaultViewProps {
+  selectedArtifactId?: string | null;
+}
+
+export const CodeVaultView: React.FC<CodeVaultViewProps> = ({ selectedArtifactId }) => {
   const allArtifacts: CodeArtifact[] = [...CREATIONS_ARCHIVE, VALIDATION_TEST_SUITE];
   
-  const [selectedId, setSelectedId] = useState<string>('vsat-toolkit');
+  const [selectedId, setSelectedId] = useState<string>(selectedArtifactId || 'vsat-toolkit');
   const [categoryFilter, setCategoryFilter] = useState<'All' | 'Cyber Defense' | 'Quantum Tensor' | 'Validation Suite'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (selectedArtifactId && allArtifacts.some((a) => a.id === selectedArtifactId)) {
+      setSelectedId(selectedArtifactId);
+      setCategoryFilter('All');
+      setSearchQuery('');
+    }
+  }, [selectedArtifactId]);
 
   const filteredArtifacts = allArtifacts.filter(a => {
     const matchesCategory = categoryFilter === 'All' || a.category === categoryFilter;

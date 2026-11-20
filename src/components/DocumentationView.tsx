@@ -1,7 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BookOpen, Cpu, Shield, Sparkles, Binary, CheckCircle2, AlertTriangle, Layers } from 'lucide-react';
 
-export const DocumentationView: React.FC = () => {
+interface DocumentationViewProps {
+  activeSectionId?: string | null;
+}
+
+export const DocumentationView: React.FC<DocumentationViewProps> = ({ activeSectionId }) => {
+  useEffect(() => {
+    if (!activeSectionId) return;
+    const el = document.getElementById(activeSectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [activeSectionId]);
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       
@@ -24,7 +36,12 @@ export const DocumentationView: React.FC = () => {
       </div>
 
       {/* Chapter 1: The Ewin Tang Breakthrough */}
-      <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/70 space-y-4">
+      <div
+        id="doc-ewin-tang"
+        className={`scroll-mt-24 p-6 rounded-2xl border bg-slate-900/70 space-y-4 transition ${
+          activeSectionId === 'doc-ewin-tang' ? 'border-cyan-400/70 ring-1 ring-cyan-500/30' : 'border-slate-800'
+        }`}
+      >
         <div className="flex items-center space-x-2 text-cyan-400">
           <Binary className="h-5 w-5" />
           <h3 className="text-lg font-bold text-white">1. The Ewin Tang Breakthrough: Classical Dequantization (2018)</h3>
@@ -52,7 +69,12 @@ export const DocumentationView: React.FC = () => {
       </div>
 
       {/* Chapter 2: The GBS & Jiuzhang Quantum Supremacy Dispute */}
-      <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/70 space-y-4">
+      <div
+        id="doc-gbs-jiuzhang"
+        className={`scroll-mt-24 p-6 rounded-2xl border bg-slate-900/70 space-y-4 transition ${
+          activeSectionId === 'doc-gbs-jiuzhang' ? 'border-purple-400/70 ring-1 ring-purple-500/30' : 'border-slate-800'
+        }`}
+      >
         <div className="flex items-center space-x-2 text-purple-400">
           <Cpu className="h-5 w-5" />
           <h3 className="text-lg font-bold text-white">2. Gaussian Boson Sampling (GBS) vs Classical Tensor Networks (2020–2023)</h3>
@@ -84,7 +106,12 @@ export const DocumentationView: React.FC = () => {
       </div>
 
       {/* Chapter 3: Boundary MPS (BMPS) and Kraus Channels */}
-      <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/70 space-y-4">
+      <div
+        id="doc-bmps-kraus"
+        className={`scroll-mt-24 p-6 rounded-2xl border bg-slate-900/70 space-y-4 transition ${
+          activeSectionId === 'doc-bmps-kraus' ? 'border-rose-400/70 ring-1 ring-rose-500/30' : 'border-slate-800'
+        }`}
+      >
         <div className="flex items-center space-x-2 text-rose-400">
           <Layers className="h-5 w-5" />
           <h3 className="text-lg font-bold text-white">3. Boundary MPS (BMPS) Contraction &amp; Von Neumann Entropy</h3>
@@ -115,7 +142,12 @@ export const DocumentationView: React.FC = () => {
       </div>
 
       {/* Chapter 4: NIST Post-Quantum Cryptography Roadmap */}
-      <div className="p-6 rounded-2xl border border-slate-800 bg-slate-900/70 space-y-4">
+      <div
+        id="doc-nist-pqc"
+        className={`scroll-mt-24 p-6 rounded-2xl border bg-slate-900/70 space-y-4 transition ${
+          activeSectionId === 'doc-nist-pqc' ? 'border-emerald-400/70 ring-1 ring-emerald-500/30' : 'border-slate-800'
+        }`}
+      >
         <div className="flex items-center space-x-2 text-emerald-400">
           <Shield className="h-5 w-5" />
           <h3 className="text-lg font-bold text-white">4. NIST Post-Quantum Cryptography (PQC) Transition Standards</h3>

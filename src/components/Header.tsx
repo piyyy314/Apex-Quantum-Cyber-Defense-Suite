@@ -1,11 +1,12 @@
 import React from 'react';
-import { Shield, Cpu, Code, BookOpen, Download, Terminal, Activity, Zap } from 'lucide-react';
+import { Shield, Cpu, Code, BookOpen, Download, Activity, Zap, Search } from 'lucide-react';
 import { AppTrack } from '../types';
 
 interface HeaderProps {
   activeTrack: AppTrack;
   onSelectTrack: (track: AppTrack) => void;
   onDownloadAll: () => void;
+  onOpenCommandPalette: () => void;
   pqcKeysCount: number;
   blockedThreatsCount: number;
   entropyBits: number;
@@ -15,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTrack,
   onSelectTrack,
   onDownloadAll,
+  onOpenCommandPalette,
   pqcKeysCount,
   blockedThreatsCount,
   entropyBits,
@@ -114,6 +116,19 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>Theory &amp; Docs</span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              title="Open Command Palette (Ctrl+K)"
+              className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 text-xs font-medium transition"
+            >
+              <Search className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="hidden xl:inline text-slate-400">Search...</span>
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-950 border border-slate-800 rounded">
+                Ctrl+K
+              </kbd>
+            </button>
 
             <button
               onClick={onDownloadAll}

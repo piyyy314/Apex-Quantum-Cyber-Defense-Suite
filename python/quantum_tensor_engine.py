@@ -41,7 +41,7 @@ class AdvancedTensorNetwork:
         T_B = self.tensors[target2]
 
         block = _contract("lir,rjs->lijs", T_A, T_B)
-        block = _contract("abcd,lcrd->labr", np.asarray(gate, dtype=np.complex128).reshape(2, 2, 2, 2), block)
+        block = _contract("abij,lijs->labs", np.asarray(gate, dtype=np.complex128).reshape(2, 2, 2, 2), block)
 
         L_dim = block.shape[0] * block.shape[1]
         R_dim = block.shape[2] * block.shape[3]
